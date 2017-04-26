@@ -1,21 +1,3 @@
-Skip to content
-This repository
-Search
-Pull requests
-Issues
-Gist
- @zhouchangxun
- Sign out
- Watch 1
-  Star 11
-  Fork 9 mritd/mritd.github.io
- Code  Issues 2  Pull requests 0  Projects 0  Wiki  Pulse  Graphs
-Branch: master Find file Copy pathmritd.github.io/Gemfile
-cf8432c  on 17 Mar
- mritd 升级 jekyll 版本
-1 contributor
-RawBlameHistory     
-47 lines (45 sloc)  1.4 KB
 source 'https://rubygems.org'
 
 gem 'jekyll', '3.4.2'
@@ -62,5 +44,3 @@ gem 'nokogiri', '1.6.8.1'
 gem 'rouge', '1.11.1'
 gem 'safe_yaml', '1.0.4'
 gem 'sass', '3.4.23'
-Contact GitHub API Training Shop Blog About
-© 2017 GitHub, Inc. Terms Privacy Security Status Help
