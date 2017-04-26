@@ -8,7 +8,7 @@ script:
   - bundle exec jekyll build
 after_success:
   - git clone https://github.com/zhouchangxun/blog.git
-  - cd mritd.me && rm -rf * && cp -r ../_site/* .
+  - cd blog && rm -rf * && cp -r ../_site/* .
   - git config user.name "zhouchangxun"
   - git config user.email "changxunzhou@qq.com"
   - git add --all .
