@@ -7,6 +7,7 @@ script:
   - bundle install
   - bundle exec jekyll build
 after_success:
+  - ls -R
   - git clone https://github.com/zhouchangxun/blog.git
   - cd blog && rm -rf * && cp -r ../_site/* .
   - git config user.name "zhouchangxun"
