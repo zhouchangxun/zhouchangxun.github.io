@@ -3,9 +3,9 @@ rvm:
   - 2.3.3
 before_install:
   - echo "zcx:before_install..."
-  - gem install jekyll -v '2.0.0.alpha.1'
 script:
-  - jekyll build
+  - bundle install
+  - bundle exec jekyll build
 after_success:
   - git clone https://github.com/zhouchangxun/blog.git
   - cd mritd.me && rm -rf * && cp -r ../_site/* .
@@ -14,7 +14,6 @@ after_success:
   - git add --all .
   - git commit -m "Travis CI Auto Builder"
   - git push --force https://$DEPLOY_TOKEN@github.com/zhouchangxun/blog.git master
-  - echo "zcx:after_success..."
 branches:
   only:
   - master
