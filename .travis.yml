@@ -3,9 +3,9 @@ rvm:
   - 2.3.3
 before_install:
   - echo "zcx:before_install..."
+  - gem install jekyll -v '2.0.0.alpha.1'
 script:
-  - bundle install
-  - bundle exec jekyll build
+  - jekyll build
 after_success:
   - git clone https://github.com/zhouchangxun/blog.git
   - cd mritd.me && rm -rf * && cp -r ../_site/* .
