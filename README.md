@@ -1,6 +1,6 @@
 ## My Project List
 
-- [unix.js](https://github.com/zhouchangxun/unix.js) [see demo](oh-my.ga/unix.js)
+- [online OS based on javascript](https://github.com/zhouchangxun/unix.js) see [demo](oh-my.ga/unix.js)
 
 ### Markdown
 
@@ -25,4 +25,5 @@ Syntax highlighted code block
 ```
 
 ### Support or Contact
+goto my github: [https://github.com/zhouchangxun/](https://github.com/zhouchangxun/)
 
