@@ -1,6 +1,7 @@
 ## My Project List
 
-- [online OS based on javascript](https://github.com/zhouchangxun/unix.js) see [demo](oh-my.ga/unix.js)
+- online OS based on javascript:[https://github.com/zhouchangxun/unix.js](https://github.com/zhouchangxun/unix.js) 
+demo: [http://oh-my.ga/unix.js](unix.js)
 
 ### Markdown
 
