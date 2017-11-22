@@ -1,10 +1,10 @@
 ## My Project List
  
-|Name | description | github source | online Demo |
-|---|---|---|---|
-|`unix.js` | online OS based on javascript | https://github.com/zhouchangxun/unix.js | [play it!](http://oh-my.ga/unix.js) |
-|`superMario`| classic game for study javascript | https://github.com/zhouchangxun/superMario | [play it!](http://oh-my.ga/superMario) |
-|`markown editor`| edit and preview markdown realtime! |https://github.com/zhouchangxun/simple | [play it!](http://oh-my.ga/simple/editor.html) |
+|Name | description | Demo |
+|---|:---|---|
+|[`unix.js`](https://github.com/zhouchangxun/unix.js) | online OS based on javascript |  [play it!](http://oh-my.ga/unix.js) |
+|[`superMario`](https://github.com/zhouchangxun/superMario)| classic game for study javascript | [play it!](http://oh-my.ga/superMario) |
+|[`markown editor`](https://github.com/zhouchangxun/simple)| edit and preview markdown realtime! | [play it!](http://oh-my.ga/simple/editor.html) |
 
 ### Markdown Syntax
 
