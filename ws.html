@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Client</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background-color: #f5f5f5;
+            align-items: center;
+        }
+        header {
+            background-color: #07c160;
+            color: white;
+            text-align: center;
+            padding: 10px 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        #connection-container {
+            display: flex;
+            padding: 10px;
+            background-color: white;
+            border-bottom: 1px solid #ccc;
+            width: 80%;
+            max-width: 600px;
+            box-sizing: border-box;
+            margin-top: 20px;
+        }
+        #chat-container {
+            flex: 1;
+            overflow-y: scroll;
+            padding: 10px;
+            box-sizing: border-box;
+            width: 80%;
+            max-width: 600px;
+            background-color: white;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .message {
+            margin: 10px 0;
+            max-width: 70%;
+            word-wrap: break-word;
+            display: flex;
+            flex-direction: column;
+        }
+        .message.user {
+            justify-content: flex-end;
+            align-items: flex-end;
+        }
+        .message.server {
+            justify-content: flex-start;
+            align-items: flex-start;
+        }
+        .message.status {
+            justify-content: center;
+            align-items: center;
+        }
+        .message.error {
+            justify-content: center;
+            align-items: center;
+        }
+        .nickname {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 5px;
+        }
+        .message p {
+            margin: 0;
+            padding: 10px;
+            border-radius: 20px;
+        }
+        .message.user p {
+            background-color: #dcf8c6;
+        }
+        .message.server p {
+            background-color: #ffffff;
+            border: 1px solid #ccc;
+        }
+        .message.status p {
+            background-color: #e0e0e0;
+        }
+        .message.error p {
+            background-color: #ffcccc;
+        }
+        footer {
+            display: flex;
+            padding: 10px;
+            background-color: white;
+            border-top: 1px solid #ccc;
+            width: 80%;
+            max-width: 600px;
+            box-sizing: border-box;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 10px;
+            margin-right: 10px;
+            border: 1px solid #ccc;
+            border-radius: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            background-color: #07c160;
+            color: white;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+        button:disabled {
+            background-color: #ccc;
+        }
+        button.disconnect {
+            background-color: #ff4d4f;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>WebSocket Chat</h1>
+    </header>
+    <div id="connection-container">
+        <input type="text" id="ws-url" placeholder="Enter WebSocket URL" />
+        <button id="connect-button" onclick="toggleConnection()">Connect</button>
+    </div>
+    <div id="chat-container"></div>
+    <footer>
+        <input type="text" id="message-input" placeholder="Enter message" disabled onkeydown="handleKeyPress(event)" />
+        <button id="send-button" onclick="sendMessage()" disabled>Send</button>
+    </footer>
+
+    <script>
+        let socket;
+
+        function toggleConnection() {
+            const wsUrlInput = document.getElementById('ws-url');
+            const connectButton = document.getElementById('connect-button');
+            const messageInput = document.getElementById('message-input');
+            const sendButton = document.getElementById('send-button');
+
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                // Disconnect
+                socket.close();
+                connectButton.textContent = 'Connect';
+                connectButton.classList.remove('disconnect');
+                wsUrlInput.disabled = false;
+                messageInput.disabled = true;
+                sendButton.disabled = true;
+            } else {
+                // Connect
+                const url = wsUrlInput.value;
+                if (!url) return alert('Please enter a WebSocket URL');
+
+                socket = new WebSocket(url);
+
+                socket.onopen = () => {
+                    console.log('Connected to server');
+                    wsUrlInput.disabled = true;
+                    messageInput.disabled = false;
+                    sendButton.disabled = false;
+                    connectButton.textContent = 'Disconnect';
+                    connectButton.classList.add('disconnect');
+                    appendMessage('Connected to server', 'status', '');
+                };
+
+                socket.onmessage = (event) => {
+                    console.log('Received:', event.data);
+                    appendMessage(event.data, 'server', '服务端');
+                };
+
+                socket.onclose = () => {
+                    console.log('Disconnected from server');
+                    wsUrlInput.disabled = false;
+                    messageInput.disabled = true;
+                    sendButton.disabled = true;
+                    connectButton.textContent = 'Connect';
+                    connectButton.classList.remove('disconnect');
+                    appendMessage('Disconnected from server', 'status', '');
+                };
+
+                socket.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    appendMessage(`Error: ${error.message}`, 'error', '');
+                };
+            }
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('message-input');
+            const message = input.value.trim();
+            if (!message) return;
+
+            socket.send(message);
+            appendMessage(message, 'user', '自己');
+            input.value = '';
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault(); // Prevent form submission or other default actions
+                sendMessage();
+            }
+        }
+
+        function appendMessage(text, type, nickname) {
+            const chatContainer = document.getElementById('chat-container');
+            const div = document.createElement('div');
+            div.className = `message ${type}`;
+
+            if (nickname) {
+                const nickSpan = document.createElement('span');
+                nickSpan.className = 'nickname';
+                nickSpan.textContent = nickname;
+                div.appendChild(nickSpan);
+            }
+
+            const p = document.createElement('p');
+            p.textContent = text;
+            div.appendChild(p);
+            chatContainer.appendChild(div);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+    </script>
+</body>
+</html>
+
+
+
