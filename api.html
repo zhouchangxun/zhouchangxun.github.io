@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <title>API 请求调试工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Microsoft YaHei", "PingFang SC", monospace;
+        }
+        body {
+            padding: 10px;
+            background-color: #f5f5f5;
+            min-height: 100vh;
+        }
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            margin-bottom: 15px;
+            text-align: center;
+            color: #333;
+            font-size: 1.5rem;
+        }
+        .request-section {
+            margin-bottom: 15px;
+            padding: 15px;
+            border: 1px solid #eee;
+            border-radius: 6px;
+        }
+        .form-group {
+            margin-bottom: 12px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+            font-size: 0.9rem;
+        }
+        input[type="text"], select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+            font-family: -apple-system, BlinkMacSystemFont, monospace;
+        }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+        .btn {
+            flex: 1;
+            min-width: 80px;
+            padding: 10px 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background-color 0.2s;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        .btn-reset {
+            background-color: #6c757d;
+        }
+        .btn-reset:hover {
+            background-color: #545b62;
+        }
+        .header-item {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        .header-item input {
+            flex: 1;
+        }
+        .add-header-btn {
+            padding: 8px 12px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            margin-bottom: 10px;
+        }
+        .add-header-btn:hover {
+            background-color: #218838;
+        }
+        .remove-header-btn {
+            padding: 8px;
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            min-width: 40px;
+        }
+        .remove-header-btn:hover {
+            background-color: #c82333;
+        }
+        .response-section {
+            padding: 15px;
+            border: 1px solid #eee;
+            border-radius: 6px;
+        }
+        .response-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .response-status {
+            font-weight: 600;
+            color: #28a745;
+            font-size: 0.9rem;
+        }
+        .response-body {
+            padding: 12px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: Consolas, monospace;
+            font-size: 0.85rem;
+            max-height: 400px;
+            overflow-y: auto;
+            line-height: 1.4;
+        }
+        .error {
+            color: #dc3545;
+        }
+        .loading {
+            color: #17a2b8;
+            font-style: italic;
+        }
+        /* 移动端适配 */
+        @media (max-width: 768px) {
+            body {
+                padding: 5px;
+            }
+            .container {
+                padding: 10px;
+            }
+            .header {
+                font-size: 1.2rem;
+                margin-bottom: 10px;
+            }
+            .request-section, .response-section {
+                padding: 10px;
+            }
+            .form-group {
+                margin-bottom: 10px;
+            }
+            .response-body {
+                max-height: 300px;
+                font-size: 0.8rem;
+            }
+            .header-item {
+                flex-direction: column;
+                gap: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="header">API 请求调试工具</h1>
+        
+        <!-- 请求配置区域 -->
+        <div class="request-section">
+            <h3 style="margin-bottom: 10px; font-size: 1.1rem;">请求配置</h3>
+            <div class="form-group">
+                <label for="method">请求方法</label>
+                <select id="method">
+                    <option value="GET">GET</option>
+                    <option value="POST">POST</option>
+                    <option value="PUT">PUT</option>
+                    <option value="DELETE">DELETE</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="url">API 地址</label>
+                <input type="text" id="url" placeholder="例如：https://jsonplaceholder.typicode.com/posts/1" value="https://jsonplaceholder.typicode.com/posts/1">
+            </div>
+            
+            <!-- 新增Header配置区域 -->
+            <div class="form-group">
+                <label>请求头 (Headers)</label>
+                <button class="add-header-btn" id="addHeaderBtn">+ 添加请求头</button>
+                <div id="headersContainer">
+                    <!-- 默认请求头 -->
+                    <div class="header-item">
+                        <input type="text" class="header-key" placeholder="Key (例如：Content-Type)" value="Content-Type">
+                        <input type="text" class="header-value" placeholder="Value (例如：application/json)" value="application/json">
+                        <button class="remove-header-btn">×</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="body">请求体 (JSON 格式，仅 POST/PUT/DELETE 有效)</label>
+                <textarea id="body" placeholder='例如：{"title": "foo", "body": "bar", "userId": 1}'></textarea>
+            </div>
+            
+            <div class="btn-group">
+                <button class="btn" id="sendBtn">发送请求</button>
+                <button class="btn btn-reset" id="resetBtn">重置</button>
+            </div>
+        </div>
+
+        <!-- 响应展示区域 -->
+        <div class="response-section">
+            <div class="response-header">
+                <h3 style="font-size: 1.1rem;">响应结果</h3>
+                <span id="status" class="response-status"></span>
+            </div>
+            <div id="responseBody" class="response-body">等待发送请求...</div>
+        </div>
+    </div>
+
+    <script>
+        // 获取DOM元素
+        const sendBtn = document.getElementById('sendBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const addHeaderBtn = document.getElementById('addHeaderBtn');
+        const headersContainer = document.getElementById('headersContainer');
+        const methodSelect = document.getElementById('method');
+        const urlInput = document.getElementById('url');
+        const bodyInput = document.getElementById('body');
+        const statusElement = document.getElementById('status');
+        const responseBodyElement = document.getElementById('responseBody');
+
+        // 添加请求头行
+        addHeaderBtn.addEventListener('click', () => {
+            const headerItem = document.createElement('div');
+            headerItem.className = 'header-item';
+            headerItem.innerHTML = `
+                <input type="text" class="header-key" placeholder="Key (例如：Authorization)">
+                <input type="text" class="header-value" placeholder="Value (例如：Bearer token)">
+                <button class="remove-header-btn">×</button>
+            `;
+            headersContainer.appendChild(headerItem);
+            
+            // 为新添加的删除按钮绑定事件
+            headerItem.querySelector('.remove-header-btn').addEventListener('click', function() {
+                // 确保至少保留一个请求头
+                if (headersContainer.children.length > 1) {
+                    headerItem.remove();
+                } else {
+                    alert('至少保留一个请求头');
+                }
+            });
+        });
+
+        // 为默认的删除按钮绑定事件
+        document.querySelectorAll('.remove-header-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                if (headersContainer.children.length > 1) {
+                    this.parentElement.remove();
+                } else {
+                    alert('至少保留一个请求头');
+                }
+            });
+        });
+
+        // 收集请求头
+        function getHeaders() {
+            const headers = {};
+            const headerItems = document.querySelectorAll('.header-item');
+            
+            headerItems.forEach(item => {
+                const key = item.querySelector('.header-key').value.trim();
+                const value = item.querySelector('.header-value').value.trim();
+                if (key) { // 只收集有key的请求头
+                    headers[key] = value;
+                }
+            });
+            
+            return headers;
+        }
+
+        // 发送请求函数
+        async function sendRequest() {
+            const method = methodSelect.value;
+            const url = urlInput.value.trim();
+            const body = bodyInput.value.trim();
+
+            // 基础校验
+            if (!url) {
+                alert('请输入API地址！');
+                return;
+            }
+
+            // 重置响应区域
+            statusElement.textContent = '';
+            responseBodyElement.textContent = '正在请求...';
+            responseBodyElement.className = 'response-body loading';
+
+            try {
+                // 构建请求配置
+                const requestOptions = {
+                    method: method,
+                    headers: getHeaders(), // 使用收集到的请求头
+                };
+
+                // 仅非GET请求处理请求体
+                if (method !== 'GET' && body) {
+                    // 尝试解析JSON，确保格式正确
+                    const parsedBody = JSON.parse(body);
+                    requestOptions.body = JSON.stringify(parsedBody);
+                }
+
+                // 发送请求
+                const response = await fetch(url, requestOptions);
+                
+                // 获取响应状态
+                statusElement.textContent = `状态码: ${response.status} ${response.statusText}`;
+                statusElement.style.color = response.ok ? '#28a745' : '#dc3545';
+
+                // 获取响应内容（优先尝试JSON，失败则获取文本）
+                let responseData;
+                try {
+                    responseData = await response.json();
+                    // 格式化JSON显示
+                    responseBodyElement.textContent = JSON.stringify(responseData, null, 2);
+                } catch (e) {
+                    responseData = await response.text();
+                    responseBodyElement.textContent = responseData;
+                }
+
+                responseBodyElement.className = 'response-body';
+
+            } catch (error) {
+                // 捕获请求异常（如网络错误、JSON解析错误）
+                statusElement.textContent = '请求失败';
+                statusElement.style.color = '#dc3545';
+                responseBodyElement.textContent = `错误信息：${error.message}`;
+                responseBodyElement.className = 'response-body error';
+            }
+        }
+
+        // 重置函数
+        function resetForm() {
+            methodSelect.value = 'GET';
+            urlInput.value = 'https://jsonplaceholder.typicode.com/posts/1';
+            bodyInput.value = '';
+            statusElement.textContent = '';
+            responseBodyElement.textContent = '等待发送请求...';
+            responseBodyElement.className = 'response-body';
+            
+            // 重置请求头（保留默认的Content-Type）
+            headersContainer.innerHTML = `
+                <div class="header-item">
+                    <input type="text" class="header-key" placeholder="Key (例如：Content-Type)" value="Content-Type">
+                    <input type="text" class="header-value" placeholder="Value (例如：application/json)" value="application/json">
+                    <button class="remove-header-btn">×</button>
+                </div>
+            `;
+            
+            // 重新绑定删除按钮事件
+            headersContainer.querySelector('.remove-header-btn').addEventListener('click', function() {
+                alert('至少保留一个请求头');
+            });
+        }
+
+        // 绑定事件
+        sendBtn.addEventListener('click', sendRequest);
+        resetBtn.addEventListener('click', resetForm);
+
+        // 支持按Enter键发送请求
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.ctrlKey) {
+                sendRequest();
+            }
+        });
+    </script>
+</body>
+</html>
