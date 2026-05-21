@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Interactive Bash</title>
+  <!-- 引入 xterm.js 样式 -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+  <style>
+    body, html { margin: 0; padding: 0; height: 100%; background-color: #1e1e1e; overflow: hidden; }
+    #terminal { height: 100%; padding: 10px; box-sizing: border-box; }
+  </style>
+</head>
+<body>
+  <div id="terminal"></div>
+
+  <script type="module">
+    // 1. 导入 xterm.js (使用 esm.sh CDN，支持 ESM 导入)
+    import { Terminal } from 'https://esm.sh/xterm@5.3.0';
+    import { FitAddon } from 'https://esm.sh/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js';
+
+    // 2. 导入 just-bash (使用 esm.sh CDN)
+    import { Bash, defineCommand } from 'https://esm.sh/just-bash@3.0.1';
+
+    // 定义自定义命令
+    const hello = defineCommand("hello", async (args, ctx) => {
+    const name = args[0] || "world";
+    return { stdout: `Hello, ${name}!\n`, stderr: "", exitCode: 0 };
+    });
+    let customCommands = [hello];
+
+    
+    // --- 初始化终端 ---
+    const term = new Terminal({
+      cursorBlink: true,
+      theme: { background: '#1e1e1e', foreground: '#ffffff' },
+      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+      fontSize: 18
+    });
+
+    const fitAddon = new FitAddon();
+    term.loadAddon(fitAddon);
+    term.open(document.getElementById('terminal'));
+    fitAddon.fit();
+
+    // --- Shell 状态 ---
+    let _cwd = '/home/user';
+    let _line = '';
+    let _cursor = 0;
+    let _buffer = '';
+    let _history = [];
+    let _historyPos = -1;
+    let _busy = false;
+    let write = (text) => term.write(text);
+    // --- 生成 Prompt ---
+    const defaultPrompt = (cwd) => {
+      const display = cwd.replace(/^\/home\/user/, '~') || '/';
+      return `\x1b[1;32muser@localhost\x1b[0m:\x1b[1;34m${display}\x1b[0m$ `;
+    };
+
+    // --- 执行命令 ---
+    const executeCommand = async (cmd) => {
+      if (!cmd.trim()) {
+        term.write(defaultPrompt(_cwd));
+        return;
+      }
+
+      _busy = true;
+      try {
+        // 先 cd 到当前目录，然后执行命令
+        const wrapped = `cd ${JSON.stringify(_cwd)} && ${cmd}`;
+        const result = await bash.exec(wrapped);
+
+        // 输出 stdout
+        if (result.stdout) {
+          write(result.stdout.replace(/\n/g, '\r\n'));
+          if (!result.stdout.endsWith('\n')) write('\r\n');
+        }
+
+        // 输出 stderr (红色)
+        if (result.stderr) {
+          write(`\x1b[31m${result.stderr.replace(/\n/g, '\r\n')}\x1b[0m`);
+          if (!result.stderr.endsWith('\n')) write('\r\n');
+        }
+
+        // 更新 cwd (通过 pwd 获取)
+        const pwdResult = await bash.exec(
+          `cd ${JSON.stringify(_cwd)} 2>/dev/null; ${cmd} >/dev/null 2>&1; pwd`
+        );
+        const lines = pwdResult.stdout?.trim().split('\n') ?? [];
+        const lastLine = lines[lines.length - 1]?.trim();
+        if (lastLine?.startsWith('/')) {
+          _cwd = lastLine;
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
+        write(`\x1b[31m${msg}\x1b[0m\r\n`);
+      } finally {
+        _busy = false;
+        write(defaultPrompt(_cwd));
+      }
+    };
+
+    // --- Tab 补全 ---
+    const tabComplete = async () => {
+      if (!bash) return;
+
+      const parts = _line.split(/\s+/);
+      const word = parts[parts.length - 1] ?? '';
+      const isFirst = parts.length <= 1;
+
+      let dir;
+      let prefix;
+
+      if (word.includes('/')) {
+        const lastSlash = word.lastIndexOf('/');
+        const rawDir = word.slice(0, lastSlash + 1);
+        prefix = word.slice(lastSlash + 1);
+
+        if (rawDir.startsWith('/')) {
+          dir = rawDir;
+        } else if (rawDir.startsWith('~/')) {
+          dir = `/home/user/${rawDir.slice(2)}`;
+        } else {
+          dir = `${_cwd}/${rawDir}`;
+        }
+      } else {
+        dir = _cwd;
+        prefix = word;
+      }
+
+      let candidates = [];
+
+      try {
+        const result = await bash.exec(`ls -1a ${JSON.stringify(dir)}`, {
+          cwd: _cwd,
+        });
+        if (result.exitCode === 0 && result.stdout) {
+          candidates = result.stdout
+            .split('\n')
+            .filter((f) => f && f !== '.' && f !== '..' && f.startsWith(prefix));
+        }
+      } catch {
+        return;
+      }
+
+      // 尝试补全命令（遍历 PATH 环境变量）
+      if (isFirst && !word.includes('/')) {
+        try {
+          // 获取 PATH 环境变量
+          const pathResult = await bash.exec('echo $PATH', { cwd: _cwd });
+          if (pathResult.exitCode === 0 && pathResult.stdout) {
+            const paths = pathResult.stdout.trim().split(':');
+            
+            for (const dir of paths) {
+              if (!dir) continue;
+              
+              try {
+                const lsResult = await bash.exec(`ls -1 ${JSON.stringify(dir)} 2>/dev/null`, { cwd: _cwd });
+                if (lsResult.exitCode === 0 && lsResult.stdout) {
+                  const files = lsResult.stdout.split('\n').filter(f => f && f.startsWith(prefix));
+                  for (const f of files) {
+                    if (!candidates.includes(f)) {
+                      candidates.push(f);
+                    }
+                  }
+                }
+              } catch {
+                // 忽略无法访问的目录
+              }
+            }
+          }
+        } catch (e) {
+          console.log('命令补全失败:', e);
+        }
+      }
+
+      if (candidates.length === 0) return;
+
+      if (candidates.length === 1) {
+        const completion = candidates[0].slice(prefix.length);
+        if (completion) {
+          _line += completion;
+          _cursor += completion.length;
+          write(completion);
+        }
+
+        // 如果是目录，添加 /
+        try {
+          const full = word + completion;
+          const testPath = full.startsWith('/') ? full : `${_cwd}/${full}`;
+          const stat = await bash.exec(
+            `test -d ${JSON.stringify(testPath)} && echo DIR`,
+            { cwd: _cwd }
+          );
+          if (stat.stdout?.trim() === 'DIR' && !_line.endsWith('/')) {
+            _line += '/';
+            _cursor++;
+            write('/');
+          }
+        } catch {
+          // 忽略
+        }
+      } else {
+        // 找公共前缀
+        let common = candidates[0];
+        for (let i = 1; i < candidates.length; i++) {
+          while (!candidates[i].startsWith(common)) {
+            common = common.slice(0, -1);
+          }
+        }
+
+        const partialCompletion = common.slice(prefix.length);
+        if (partialCompletion) {
+          _line += partialCompletion;
+          _cursor += partialCompletion.length;
+          write(partialCompletion);
+        } else {
+          // 显示所有候选
+          write('\r\n');
+          write(candidates.join('  ').replace(/\n/g, '\r\n'));
+          write('\r\n');
+          write(defaultPrompt(_cwd));
+          write(_line);
+        }
+      }
+    };
+
+    // --- 处理输入 ---
+    term.onData(async (data) => {
+      if (!write || _busy) return;
+
+      // Tab 补全
+      if (data === '\t') {
+        await tabComplete();
+        return;
+      }
+
+      // Enter 执行命令
+      if (data === '\r') {
+        const cur = _line;
+        _line = '';
+        _cursor = 0;
+        write('\r\n');
+
+        // 多行支持 (以 \ 结尾)
+        if (cur.endsWith('\\')) {
+          _buffer += cur + '\n';
+          write('> ');
+          return;
+        }
+
+        const cmd = _buffer + cur;
+        _buffer = '';
+
+        if (cmd.trim()) {
+          _history.push(cmd);
+          _historyPos = -1;
+          _busy = true;
+          await executeCommand(cmd);
+          _busy = false;
+        } else {
+          write(defaultPrompt(_cwd));
+        }
+        return;
+      }
+
+      // Backspace
+      if (data === '\x7f' || data === '\b') {
+        if (_cursor > 0) {
+          const tail = _line.slice(_cursor);
+          _line = _line.slice(0, _cursor - 1) + tail;
+          _cursor--;
+          write('\b' + tail + '\x1b[K');
+          if (tail.length > 0) write(`\x1b[${tail.length}D`);
+        }
+        return;
+      }
+
+      // 上箭头 - 历史上一条命令
+      if (data === '\x1b[A') {
+        if (!_history.length) return;
+        if (_historyPos < 0) _historyPos = _history.length;
+        if (_historyPos > 0) {
+          _historyPos--;
+          const entry = _history[_historyPos];
+          write(`\r${defaultPrompt(_cwd)}\x1b[K${entry}`);
+          _line = entry;
+          _cursor = entry.length;
+        }
+        return;
+      }
+
+      // 下箭头 - 历史下一条命令
+      if (data === '\x1b[B') {
+        if (_historyPos < 0) return;
+        _historyPos++;
+        if (_historyPos >= _history.length) {
+          _historyPos = -1;
+          write(`\r${defaultPrompt(_cwd)}\x1b[K`);
+          _line = '';
+          _cursor = 0;
+        } else {
+          const entry = _history[_historyPos];
+          write(`\r${defaultPrompt(_cwd)}\x1b[K${entry}`);
+          _line = entry;
+          _cursor = entry.length;
+        }
+        return;
+      }
+
+      // 左箭头
+      if (data === '\x1b[D') {
+        if (_cursor > 0) {
+          _cursor--;
+          write('\x1b[D');
+        }
+        return;
+      }
+
+      // 右箭头
+      if (data === '\x1b[C') {
+        if (_cursor < _line.length) {
+          _cursor++;
+          write('\x1b[C');
+        }
+        return;
+      }
+
+      // Ctrl+A - 跳到行首
+      if (data === '\x01') {
+        if (_cursor > 0) {
+          write(`\x1b[${_cursor}D`);
+          _cursor = 0;
+        }
+        return;
+      }
+
+      // Ctrl+E - 跳到行尾
+      if (data === '\x05') {
+        if (_cursor < _line.length) {
+          write(`\x1b[${_line.length - _cursor}C`);
+          _cursor = _line.length;
+        }
+        return;
+      }
+
+      // Ctrl+U - 清空整行
+      if (data === '\x15') {
+        if (_line.length > 0) {
+          if (_cursor > 0) write(`\x1b[${_cursor}D`);
+          write('\x1b[K');
+          _line = '';
+          _cursor = 0;
+        }
+        return;
+      }
+
+      // Ctrl+C - 中断
+      if (data === '\x03') {
+        _line = '';
+        _cursor = 0;
+        _buffer = '';
+        write('^C\r\n');
+        write(defaultPrompt(_cwd));
+        return;
+      }
+
+      // Ctrl+L - 清屏
+      if (data === '\x0c') {
+        write('\x1b[2J\x1b[H');
+        write(defaultPrompt(_cwd));
+        write(_line);
+        if (_cursor < _line.length) {
+          write(`\x1b[${_line.length - _cursor}D`);
+        }
+        return;
+      }
+
+      // 普通可打印字符
+      if (data.length === 1 && data >= ' ') {
+        const tail = _line.slice(_cursor);
+        _line = _line.slice(0, _cursor) + data + tail;
+        _cursor++;
+
+        if (tail.length === 0) {
+          write(data);
+        } else {
+          write(data + tail + '\x1b[K');
+          write(`\x1b[${tail.length}D`);
+        }
+        return;
+      }
+
+      // 普通可打印字符处理
+      term.write(data);
+    });
+
+    // --- 窗口大小调整 ---
+    window.addEventListener('resize', () => {
+      console.log('窗口大小调整');
+      fitAddon.fit();
+    });
+
+    // --- 启动欢迎信息 ---
+    term.writeln('Welcome to Just-Bash in the browser!');
+    term.writeln('Type "help" for available commands.');
+    term.write(defaultPrompt(_cwd));
+    term.focus();
+    // --- 初始化 Bash ---
+    const bash = new Bash({
+      files: { '/home/user/file.txt': 'test content',
+        '/home/user/test_shell.sh': async () => (await fetch("/web-unix/test_shell.sh")).text(),
+       },
+      env: { SHELL: '/bin/bash', TERM: 'xterm-256color', HOME: '/home/user' },
+      cwd: _cwd,
+      customCommands: customCommands,
+      network: { dangerouslyAllowFullInternetAccess: true },
+    });
+    window.bash = bash;
+    
+  </script>
+</body>
+</html>
